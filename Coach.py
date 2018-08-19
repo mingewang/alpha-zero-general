@@ -15,7 +15,10 @@ class Coach():
     """
     def __init__(self, game, nnet, args):
         self.game = game
+        # our model
         self.nnet = nnet
+        # previous model, will replaced by nnet if
+        # nnet can beat pnet 
         self.pnet = self.nnet.__class__(self.game)  # the competitor network
         self.args = args
         self.mcts = MCTS(self.game, self.nnet, self.args)
@@ -53,12 +56,29 @@ class Coach():
             for b,p in sym:
                 trainExamples.append([b, self.curPlayer, p, None])
 
+            # why random?
             action = np.random.choice(len(pi), p=pi)
             board, self.curPlayer = self.game.getNextState(board, self.curPlayer, action)
 
+            """
+            here we play to the end of the game!
+            think of game of go, it could take a long long time.
+            so actually in this software
+            the game end is not really game's end
+            it is depends on our setting 
+            (1) native end, mean before the upper limit steps, 
+            we  know the who is winner or loser by the rule of the game
+            (2) it could be small non-zero (for draw) if we hit our upper
+            limit steps of the self-play (like 1e-4)
+            """
             r = self.game.getGameEnded(board, self.curPlayer)
 
             if r!=0:
+                """
+                  training sample (canonicalBoard,pi,v)
+                  v is the reward?
+                  what is (-1)**( x[1]!=self.curPlayer )
+                """
                 return [(x[0],x[2],r*((-1)**(x[1]!=self.curPlayer))) for x in trainExamples]
 
     def learn(self):
@@ -83,6 +103,8 @@ class Coach():
     
                 for eps in range(self.args.numEps):
                     self.mcts = MCTS(self.game, self.nnet, self.args)   # reset search tree
+                    # self-play one game until the game ended
+                    # remember if our definition of game end, not real one
                     iterationTrainExamples += self.executeEpisode()
     
                     # bookkeeping + plot progress
@@ -120,6 +142,8 @@ class Coach():
             print('PITTING AGAINST PREVIOUS VERSION')
             arena = Arena(lambda x: np.argmax(pmcts.getActionProb(x, temp=0)),
                           lambda x: np.argmax(nmcts.getActionProb(x, temp=0)), self.game)
+
+            # self-play/competed with previous model by numbe of self.args.arenaCompare games
             pwins, nwins, draws = arena.playGames(self.args.arenaCompare)
 
             print('NEW/PREV WINS : %d / %d ; DRAWS : %d' % (nwins, pwins, draws))
