@@ -49,6 +49,8 @@ class Coach():
         while True:
             episodeStep += 1
             canonicalBoard = self.game.getCanonicalForm(board,self.curPlayer)
+            # start with 1, which we use some random action to explore
+            # as times goes by, we use best estimation from NN
             temp = int(episodeStep < self.args.tempThreshold)
 
             pi = self.mcts.getActionProb(canonicalBoard, temp=temp)
@@ -56,7 +58,9 @@ class Coach():
             for b,p in sym:
                 trainExamples.append([b, self.curPlayer, p, None])
 
-            # why random?
+            # based on temp, temp=0, pi only have 1 (best) item
+            # otherwise we have a serveral items p(s,a)
+            # where a means one of the valid actions we can take
             action = np.random.choice(len(pi), p=pi)
             board, self.curPlayer = self.game.getNextState(board, self.curPlayer, action)
 
@@ -104,7 +108,7 @@ class Coach():
                 for eps in range(self.args.numEps):
                     self.mcts = MCTS(self.game, self.nnet, self.args)   # reset search tree
                     # self-play one game until the game ended
-                    # remember if our definition of game end, not real one
+                    # remember it is our definition of game end, not real one
                     iterationTrainExamples += self.executeEpisode()
     
                     # bookkeeping + plot progress
@@ -181,4 +185,4 @@ class Coach():
                 self.trainExamplesHistory = Unpickler(f).load()
             f.closed
             # examples based on the model were already collected (loaded)
-            self.skipFirstSelfPlay = True
+            oself.skipFirstSelfPlay = True
